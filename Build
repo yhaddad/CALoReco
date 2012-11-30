@@ -1,0 +1,26 @@
+#! /bin/sh
+
+
+echo "============================================================"
+echo "=                 Build Makefile for compilation           ="
+echo "============================================================"
+
+echo "  Move frome directory :"
+echo ${PWD}
+echo "  to the directory     :"
+cd ${PWD}/build
+echo ${PWD}
+
+if [ -e ${PWD}/Makefile ]; then
+    echo "  The Makefile is allrady exist .."
+    rm -rf *
+    cmake -C ${ILCSOFT}/ILCSoft.cmake ..
+    ls -lthr
+else
+    echo "  Create a new Makefile  .. "
+    cmake -C ${ILCSOFT}/ILCSoft.cmake ..
+    ls -lthr
+fi    
+
+
+echo "============================================================"

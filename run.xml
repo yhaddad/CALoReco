@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="us-ascii"?>
+<marlin xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://ilcsoft.desy.de/marlin/marlin.xsd">
+  <execute>
+    <processor name="MyHitProcess"/>
+    <!--processor name="MyLCIOOutputProcessor"/-->  
+    
+    <!--processor name="MyLCIOOutputProcessor"/-->
+    
+  </execute>
+  
+  <global>
+    <parameter name="LCIOInputFiles">
+      ./data/TDHCAL_715571.slcio
+      <!--./data/DHCAL_714408_I3_0.slcio
+      ./data/DHCAL_714408_I1_0.slcio
+      ./data/DHCAL_714408_I4_0.slcio-->
+    </parameter>
+    <parameter name="MaxRecordNumber" value="15000" />  
+    <parameter name="SkipNEvents" value="0" />
+    <!--parameter name="Verbosity" type="string">MESSAGE </parameter-->
+    <parameter name="SupressCheck" value="false" />  
+  </global>
+  
+  <processor name="MyHitProcess" type="HitProcess">
+    <!--DHCAL Analysis-->
+    <!--Cut on chi2 -->
+    <parameter name="Chi2Cut" type="double">
+      20.
+    </parameter>
+    <!--HCAL Collection Names-->
+    <parameter name="HCALCollections" type="StringVec" lcioInType="CalorimeterHit">
+      SDHCAL_HIT
+    </parameter>
+    <!--Cut on nbr of cluster-->
+    <parameter name="NCluster" type="int">
+      1
+    </parameter>
+    <!--Number of Layer-->
+    <parameter name="NLayer" type="int">
+      50
+    </parameter>
+    <!--Cut on number of the hits on cluster-->
+    <parameter name="NhitCluster" type="int">
+      4
+    </parameter>
+    <!--overwrit a file if zero.-->
+    <parameter name="OverwriteFile" type="int">
+      0 
+    </parameter>
+    <!--The name of the Recostructed Particle Collection-->
+    <parameter name="RecoParticleCollName" type="string">
+      MuonRecoParticle 
+    </parameter>
+    <!--Around the reco hit-->
+    <parameter name="RegionCut" type="double">
+      2.5 
+    </parameter>
+    <!--rpc Gap (cm)-->
+    <parameter name="rpcGap" type="double">
+      2.8
+    </parameter>
+    <!--noise remove by minimal distance (cm)-->
+    <parameter name="minDistCut" type="double">
+      20 
+    </parameter>
+    <!--Use Penetrated Muons-->
+    <parameter name="usePenetratedMuons" type="bool">
+      false 
+    </parameter>
+    <!--The name of the ROOT tree-->
+    <parameter name="TreeName" type="string">
+      recoco 
+    </parameter>
+    <parameter name="offsetfile" type="string">
+      offsets.txt 
+    </parameter>
+   
+    <!--The name of the file to which the ROOT tree will be written-->
+    <parameter name="TreeOutputFile" type="string">
+      plots/RECosmic_715571_beam_selection.root
+    </parameter>
+  </processor>
+  
+  <processor name="MyLCIOOutputProcessor" type="LCIOOutputProcessor">
+    <parameter name="LCIOOutputFile" type="string">RECosmic_715571_beam_selection.slcio </parameter>
+    <parameter name="LCIOWriteMode" type="string">WRITE_NEW </parameter>
+  </processor>
+</marlin>

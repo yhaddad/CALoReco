@@ -1,0 +1,16 @@
+#! /bin/sh
+
+
+echo "============================================================"
+echo "=                      Compilation                         ="
+echo "============================================================"
+
+echo "  Move frome directory :"
+echo ${PWD}
+echo "  to the directory     :"
+cd ${PWD}/build
+echo ${PWD}
+
+make install
+
+echo "============================================================"
