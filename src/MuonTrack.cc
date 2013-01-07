@@ -95,7 +95,9 @@ namespace TRACK{
   
     for(int k=0;k < 4;k++){
       p[k] = parFit[k];
+#if DEBUG
       std::cout<<"Prameter fit p["<<k<<"] == "<< parFit[k] << std::endl;
+#endif
     }
     p[4] = chi2;
     delete min;
@@ -111,8 +113,9 @@ namespace TRACK{
     }
     
     trackFitter(_Parameter);
+#if DEBUG    
     std::cout<<"Chi2 == "<<_Parameter[4]<<std::endl;
-    
+#endif 
     gr->Delete();
   }
   

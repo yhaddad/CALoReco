@@ -61,7 +61,7 @@ public:
   
   // --------------
   void initRootTree();
-  void saveRootTree();
+  //void saveRootTree();
   void end();
   
 protected:
@@ -202,10 +202,20 @@ protected:
   
   std::string _treeFileName;
   std::string _treeName;
+  
+  std::string _hist_file_calo;
+  std::string _hist_file_current;
   std::string _colName; 
   std::string _fileName;
   std::string _outFileName;
   std::string _offset_file;
+
+  std::string _xml_geom_file;
+  std::string _xml_scan_file;
+  
+
+
+
   std::ostream *_output;
   bool _usePenetratedMuons;
   std::vector<std::string> _hcalCollections;

@@ -121,6 +121,21 @@ HitProcess::HitProcess():Processor("HitProcess"),
                               _treeFileName ,
                               _treeFileName);
 
+
+  _xml_scan_file = "scan.xml";
+  registerProcessorParameter( "scan_file" ,
+                              "file contain the threshold scan setup" ,
+                              _xml_scan_file ,
+                              _xml_scan_file );
+
+  
+  
+  _xml_geom_file = "scan.xml";
+  registerProcessorParameter( "geom_file" ,
+                              "file contain the stup geometry" ,
+                              _xml_geom_file ,
+                              _xml_geom_file );
+  
   _offset_file="offsetfile.txt";
   registerProcessorParameter( "offsetfile" ,
                               "offset file for allignement" ,
@@ -133,11 +148,30 @@ HitProcess::HitProcess():Processor("HitProcess"),
                               _treeName ,
                               _treeName);
 
+  _hist_file_calo = "hist_file_calo.root";
+  registerProcessorParameter( "hist_file_calo" ,
+                              "histogram book file for calibration" ,
+                              _hist_file_calo ,
+                              _hist_file_calo);
+  
+  _hist_file_current = "hist_file_calo.root";
+  registerProcessorParameter( "hist_file_current" ,
+                              "histogram book file for process" ,
+                              _hist_file_current ,
+                              _hist_file_current);
+
+  _treeName="recoco";
+  registerProcessorParameter( "TreeName" ,
+                              "The name of the ROOT tree" ,
+                              _treeName ,
+                              _treeName);
+  
+  
   _rpc_Gap=2.8;
   registerProcessorParameter( "rpcGap" ,
                               "rpc Gap (cm)" ,
-                              _treeName ,
-                              _treeName);
+                              _rpc_Gap ,
+                              _rpc_Gap);
   _minDistCut=12.;
   registerProcessorParameter( "minDistCut" ,
                               "noise remove by minimal distance (cm)" ,
@@ -175,7 +209,13 @@ void HitProcess::initRootTree(){
 }
 
 void HitProcess::init() {
+  
   calo = new DHCAL_Mips();
+  calo->set_geometry(_xml_geom_file.c_str());
+  calo->read_xml_scan(_xml_scan_file.c_str());
+  
+  //calo->set_xml_threshold("scan_threshold.xml");
+  
   histo_book = new HistBooker();
   printParameters();
   initRootTree();
@@ -246,6 +286,9 @@ void HitProcess::processEvent( LCEvent * evtP ){
       _eventNr=evtP->getEventNumber();
       _Nhit=0;
       
+      int run_id  = evtP-> getRunNumber();
+
+      
       LCCollection *event_coll = evtP ->getCollection(_hcalCollections[0].c_str());
       int Nhit = event_coll->getNumberOfElements();
       
@@ -296,7 +339,7 @@ void HitProcess::processEvent( LCEvent * evtP ){
       histo_book->book_h1("h1/raw/nhit",200,0,200)->Fill(Nhit);
       clus = cc.getClusters();
       clus2= cc.getClusters();
-      cc.Print();      
+      //cc.Print();      
       
       // ------------------------------
       // --------  cleaning -----------
@@ -345,7 +388,7 @@ void HitProcess::processEvent( LCEvent * evtP ){
 	}
       }
       //std::cout << "nclus ==" << test << std::endl;
-      track->positionStatus();
+      //track->positionStatus();
       track->trackReco();
       // fisrt fit
       double chi2 = track->getChi2();
@@ -396,7 +439,7 @@ void HitProcess::processEvent( LCEvent * evtP ){
       LCCollectionVec* col_clean_two = 
 	new LCCollectionVec(LCIO::CALORIMETERHIT);
       col_clean_two->setFlag(col_clean_two->getFlag()|( 1 << LCIO::RCHBIT_LONG));
-      std::cout << "selection two == "<< clean_two.size() <<std::endl;
+      //std::cout << "selection two == "<< clean_two.size() <<std::endl;
       if(clean_two.size() > 0){
 	for (std::vector<TCluster>::iterator cl= clean_two.begin();cl!=clean_two.end();cl++){
 	  track->setX(cl->getPosition()[0],cl->getPos_Error()[0]);
@@ -412,7 +455,7 @@ void HitProcess::processEvent( LCEvent * evtP ){
 	  
 	}
       }
-      track->positionStatus();
+      //track->positionStatus();
       track->trackReco();
       chi2 = track->getChi2();
       
@@ -543,8 +586,8 @@ void HitProcess::processEvent( LCEvent * evtP ){
       
       // ======================
       if(chi2 > 0. 
-	 && chi2 < _Chi2Cut 
-	 /*&& _inc_angle < 0.2*/){ // muon beam selection 
+	 && chi2 < _Chi2Cut &&
+	 _inc_angle < 0.2){ // muon beam selection 
 	double tl = getTrackLenght(clean_two);
 	//h_TrackLenght->Fill(tl);
 	//h2_TrackLenght_angle->Fill(tl,_inc_angle);
@@ -583,115 +626,118 @@ void HitProcess::processEvent( LCEvent * evtP ){
 	// -------------------------------------------------------------------------------
       
 	calo->clear();
+	calo->set_id_decoder_string( event_coll->getParameters().getStringVal(  LCIO::CellIDEncoding )) ;
+	calo->set_run_number(run_id);
 	calo->set_nlayer(50);
 	calo->set_clusters(clean_two);
 	calo->set_nhit_on_clus_cut(5);
 	calo->set_angle_cut(3.14);
 	calo->set_region_cut(_RegionCut);
-	calo->do_calibration();
-      
-
+	if(calo->penetrated_muon_test()){
+	  calo->do_calibration();
+	  calo->do_characterization();
+	}
 
 	//add the condition of number of the hits here 
-     //for(int ilayer=0; ilayer < _NLayer; ilayer++){ // loop over the layer 
-     //  // cut on number of fired layer
-     //  int NclusterCut = 0;
-     //  for (std::vector<TCluster>::iterator cl= clean_two.begin();cl!=clean_two.end();cl++){
-     //    if(cl->getLayer_id() != ilayer){
-     //      NclusterCut++;
-     //    }
-     //  }
-     //  if(NclusterCut > 15 && clean_two.size() > 5){
-     //    double pos[3] = {-1.,-1.,-1.};// the target cluster position il layer i
-     //    int Multiplicity = 0;
-     //    int mul_thr[3]={0,0,0};
-     //    chi2 = -1;
-     //    track->reset();
-     //    std::cout<<"*********"<<std::endl;
-     //    std::vector<EVENT::CalorimeterHit*> current_cluster;
-     //    //for (std::vector<TCluster>::iterator cl= clus.begin();cl!=clus.end();cl++){
-     //    for (std::vector<TCluster>::iterator cl= clean_two.begin();cl!=clean_two.end();cl++){
-     //      //if(((_NLayer) - cl->getLayer_id()) != ilayer){cleanned_events
-     //      if(cl->getLayer_id() != ilayer){
-     //	//std::cout<<" layer ---- "<< cl->getLayer_id() << " ---> "<< ilayer <<std::endl;
-     //	track->setX(cl->getPosition()[0],cl->getPos_Error()[0]);
-     //	track->setY(cl->getPosition()[1],cl->getPos_Error()[1]);
-     //	track->setZ(cl->getPosition()[2],cl->getPos_Error()[2]);
-     //	//track->setZ((_Nlayer*_rpc_Gap) - cl->getPosition()[2],cl->getPos_Error()[2]);
-     //      }else{
-     //	pos[0]=cl->getPosition()[0];
-     //	pos[1]=cl->getPosition()[1];
-     //	//std::cout<< "getPosition()[2] == " << cl->getPosition()[2] << std::endl;
-     //	//pos[2]=(_Nlayer*_rpc_Gap) - cl->getPosition()[2];
-     //	pos[2]=cl->getPosition()[2];
-     //	//std::cout<< "pos[2] == " << pos[2]<< std::endl;
-     //	Multiplicity = cl->getN();
-     //	mul_thr[0] = cl->getThrNhit(1);
-     //	mul_thr[1] = cl->getThrNhit(2);
-     //	mul_thr[2] = cl->getThrNhit(3);
-     //	current_cluster = cl->getHits();
-     //      }
-     //    }
-     //  
-     //    //track->positionStatus();
-     //    track->trackReco();
-     //    chi2 = track->getChi2();
-     //    // fill 
-     //    Cor_theta_phi->Fill(TMath::ATan(track->getParameter()[1]),
-     //			TMath::ATan(track->getParameter()[3]));
-     //  
-     //    theta_dist->Fill(TMath::ATan(track->getParameter()[1]));
-     //    phi_dist->Fill(TMath::ATan(track->getParameter()[3]));
-     //  
-     //
-     //    // ======================
-     //    double *p;
-     //    p = track -> getParameter(); 
-     //  
-     //    // ======================
-     //
-     //    if((Multiplicity <= _NhitClusterCut ) && (chi2 > 0)){
-     //      //Cor_hit_chi2->Fill(chi2,Nhit);
-     //      //chi2_dist->Fill(chi2);
-     //      mu_dist_layer->Fill(ilayer,Multiplicity);
-     //      double aax = track->getParameter()[1];
-     //      double aay = track->getParameter()[3];
-     //    
-     //      if(fabs(ACos(1/sqrt(aax*aax+aay*aay+1))) < 1.5){ // cut on the angle
-     //	fillCallibration(ilayer,_RegionCut,pos,track->getParameter());
-     //	asicEffMap(ilayer,Multiplicity,pos,track->getParameter());
-     //	effMap(current_cluster,track->getParameter());
-     //	padEffMap(ilayer,pos,track->getParameter());
-     //	//padEffScan();
-     //      }
-     //      if(Multiplicity>0){
-     //	//double aax = track->getParameter()[1];
-     //	//double aay = track->getParameter()[3];
-     //	m_inc_angle_mul_1->Fill(fabs(ACos(1/sqrt(aax*aax+aay*aay+1))),mul_thr[0]);	
-     //	m_inc_angle_mul_2->Fill(fabs(ACos(1/sqrt(aax*aax+aay*aay+1))),mul_thr[1]);	
-     //	m_inc_angle_mul_3->Fill(fabs(ACos(1/sqrt(aax*aax+aay*aay+1))),mul_thr[2]);	
-     //	m_inc_angle_mul->Fill(fabs(ACos(1/sqrt(aax*aax+aay*aay+1))),Multiplicity);	
-     //	m_angle_mul_theta->Fill(fabs(TMath::ATan(track->getParameter()[1])),Multiplicity);
-     //	m_angle_mul_phi->Fill(fabs(TMath::ATan(track->getParameter()[3])),Multiplicity);
-     //
-     //	Multiplicity_layer->Fill(ilayer,Multiplicity); 
-     //	mul_dist->Fill(Multiplicity);
-     //
-     //	h_mul_1->Fill(mul_thr[0]);
-     //	h_mul_2->Fill(mul_thr[1]);
-     //	h_mul_3->Fill(mul_thr[2]);
-     //      }
-     //    }
-     //    track->reset();
-     //  }
-     }
-     //// loop over layer 
-     //setReturnValue(true);  
-     //}else {
-     //setReturnValue(false);
-     //
+	//for(int ilayer=0; ilayer < _NLayer; ilayer++){ // loop over the layer 
+	//  // cut on number of fired layer
+	//  int NclusterCut = 0;
+	//  for (std::vector<TCluster>::iterator cl= clean_two.begin();cl!=clean_two.end();cl++){
+	//    if(cl->getLayer_id() != ilayer){
+	//      NclusterCut++;
+	//    }
+	//  }
+	//  if(NclusterCut > 15 && clean_two.size() > 5){
+	//    double pos[3] = {-1.,-1.,-1.};// the target cluster position il layer i
+	//    int Multiplicity = 0;
+	//    int mul_thr[3]={0,0,0};
+	//    chi2 = -1;
+	//    track->reset();
+	//    std::cout<<"*********"<<std::endl;
+	//    std::vector<EVENT::CalorimeterHit*> current_cluster;
+	//    //for (std::vector<TCluster>::iterator cl= clus.begin();cl!=clus.end();cl++){
+	//    for (std::vector<TCluster>::iterator cl= clean_two.begin();cl!=clean_two.end();cl++){
+	//      //if(((_NLayer) - cl->getLayer_id()) != ilayer){cleanned_events
+	//      if(cl->getLayer_id() != ilayer){
+	//	//std::cout<<" layer ---- "<< cl->getLayer_id() << " ---> "<< ilayer <<std::endl;
+	//	track->setX(cl->getPosition()[0],cl->getPos_Error()[0]);
+	//	track->setY(cl->getPosition()[1],cl->getPos_Error()[1]);
+	//	track->setZ(cl->getPosition()[2],cl->getPos_Error()[2]);
+	//	//track->setZ((_Nlayer*_rpc_Gap) - cl->getPosition()[2],cl->getPos_Error()[2]);
+	//      }else{
+	//	pos[0]=cl->getPosition()[0];
+	//	pos[1]=cl->getPosition()[1];
+	//	//std::cout<< "getPosition()[2] == " << cl->getPosition()[2] << std::endl;
+	//	//pos[2]=(_Nlayer*_rpc_Gap) - cl->getPosition()[2];
+	//	pos[2]=cl->getPosition()[2];
+	//	//std::cout<< "pos[2] == " << pos[2]<< std::endl;
+	//	Multiplicity = cl->getN();
+	//	mul_thr[0] = cl->getThrNhit(1);
+	//	mul_thr[1] = cl->getThrNhit(2);
+	//	mul_thr[2] = cl->getThrNhit(3);
+	//	current_cluster = cl->getHits();
+	//      }
+	//    }
+	//  
+	//    //track->positionStatus();
+	//    track->trackReco();
+	//    chi2 = track->getChi2();
+	//    // fill 
+	//    Cor_theta_phi->Fill(TMath::ATan(track->getParameter()[1]),
+	//			TMath::ATan(track->getParameter()[3]));
+	//  
+	//    theta_dist->Fill(TMath::ATan(track->getParameter()[1]));
+	//    phi_dist->Fill(TMath::ATan(track->getParameter()[3]));
+	//  
+	//
+	//    // ======================
+	//    double *p;
+	//    p = track -> getParameter(); 
+	//  
+	//    // ======================
+	//
+	//    if((Multiplicity <= _NhitClusterCut ) && (chi2 > 0)){
+	//      //Cor_hit_chi2->Fill(chi2,Nhit);
+	//      //chi2_dist->Fill(chi2);
+	//      mu_dist_layer->Fill(ilayer,Multiplicity);
+	//      double aax = track->getParameter()[1];
+	//      double aay = track->getParameter()[3];
+	//    
+	//      if(fabs(ACos(1/sqrt(aax*aax+aay*aay+1))) < 1.5){ // cut on the angle
+	//	fillCallibration(ilayer,_RegionCut,pos,track->getParameter());
+	//	asicEffMap(ilayer,Multiplicity,pos,track->getParameter());
+	//	effMap(current_cluster,track->getParameter());
+	//	padEffMap(ilayer,pos,track->getParameter());
+	//	//padEffScan();
+	//      }
+	//      if(Multiplicity>0){
+	//	//double aax = track->getParameter()[1];
+	//	//double aay = track->getParameter()[3];
+	//	m_inc_angle_mul_1->Fill(fabs(ACos(1/sqrt(aax*aax+aay*aay+1))),mul_thr[0]);	
+	//	m_inc_angle_mul_2->Fill(fabs(ACos(1/sqrt(aax*aax+aay*aay+1))),mul_thr[1]);	
+	//	m_inc_angle_mul_3->Fill(fabs(ACos(1/sqrt(aax*aax+aay*aay+1))),mul_thr[2]);	
+	//	m_inc_angle_mul->Fill(fabs(ACos(1/sqrt(aax*aax+aay*aay+1))),Multiplicity);	
+	//	m_angle_mul_theta->Fill(fabs(TMath::ATan(track->getParameter()[1])),Multiplicity);
+	//	m_angle_mul_phi->Fill(fabs(TMath::ATan(track->getParameter()[3])),Multiplicity);
+	//
+	//	Multiplicity_layer->Fill(ilayer,Multiplicity); 
+	//	mul_dist->Fill(Multiplicity);
+	//
+	//	h_mul_1->Fill(mul_thr[0]);
+	//	h_mul_2->Fill(mul_thr[1]);
+	//	h_mul_3->Fill(mul_thr[2]);
+	//      }
+	//    }
+	//    track->reset();
+	//  }
+      }
+      //// loop over layer 
+      //setReturnValue(true);  
+      //}else {
+      //setReturnValue(false);
+      //
       // * - */
-      std::cout << " test 1"<<std::endl;
+      //std::cout << " test 1"<<std::endl;
       delete track;
       //std::cout << " test 2"<<std::endl;
     }	
@@ -701,16 +747,16 @@ void HitProcess::processEvent( LCEvent * evtP ){
 }	
 //=========================================================
 void HitProcess::end(){
-  //_lcWriter->close() ;
-  std::cout << " the end function ...." << std::endl;
-  calo->save_plots();
-  histo_book->write_hitograms("histo_book.root");
-  saveRootTree();
-  // print the offstes
-
-	
+  calo->save_plots(_hist_file_calo.c_str());
+  histo_book->write_hitograms( _hist_file_current.c_str());
+  
+  if (_outputTree) {
+    TFile *tree_file = _outputTree->GetCurrentFile(); 
+    tree_file->Write();
+    delete tree_file;
+  }
 }
-
+ 
 //void  HitProcess::padEffMap(int Layer,double *position, double* p){
 //  int I0 = int(position[0]/1.04125);
 //  int J0 = int(position[1]/1.04125);
